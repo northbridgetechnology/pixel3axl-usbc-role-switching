@@ -785,9 +785,9 @@ It contains the development history, debugging process, implementation details, 
 
 ---
 
-# Licensing Note
+# License
 
-This repository contains Linux kernel patches plus a standalone Python boot-image patching utility. Before redistributing or incorporating the work elsewhere, review the repository's license terms. If the repository does not yet include an explicit `LICENSE` file, add one before broader redistribution so the permissions for the patch set, documentation, and Python utility are unambiguous.
+This project is licensed under the GNU General Public License v2.0 only (`GPL-2.0-only`). See [`LICENSE`](LICENSE) for details.
 
 ---
 
