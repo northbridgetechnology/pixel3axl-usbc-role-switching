@@ -244,6 +244,8 @@ This appears to be a userspace network configuration issue rather than a failure
 
 **Current known limitation:** the `172.16.42.1/24` address is not persistent across boot on the tested installation. The NCM gadget, UDC configuration, carrier, and USB role are functional; only the userspace IPv4 assignment must currently be restored manually.
 
+If `usb0` exists, the UDC is `configured`, and carrier is `1`, the kernel USB-C/device path is working even if the interface has no IPv4 address. Restoring the address with `ip addr add` is a userspace networking workaround, not a kernel/TCPM fix.
+
 ---
 
 # USB Sink / Charging Test
@@ -371,29 +373,71 @@ Image.gz + sdm670-google-bonito-sdc.dtb
 
 and uses that combined payload as the boot image kernel.
 
+## Source Boot Image Requirement
+
+The input boot image is not merely a container for the kernel. Its ramdisk/initramfs is preserved by the patcher and must be compatible with the replacement kernel.
+
+During development, two source ramdisks were tested:
+
+```text
+stale ramdisk:   13403442 bytes -> kernel booted, gadget initialization failed
+working ramdisk: 27688172 bytes -> full device/host validation passed
+```
+
+With the stale ramdisk, postmarketOS reported errors such as:
+
+```text
+modprobe: FATAL: Module ext4 not found in directory /lib/modules/7.0.10-sdm670-gaac5fb159b67
+```
+
+and `/sys/kernel/config/usb_gadget/g1` was never created. The kernel itself booted, but the initramfs could not provide the module environment expected by the new kernel.
+
+Use a **current postmarketOS boot image from the target installation**, or otherwise ensure that its initramfs/module environment matches the kernel being installed.
+
 Example:
 
 ```bash
 python3 tools/patch_bonito_usb.py \
-  --input /tmp/boot-original.img \
+  --input /tmp/current-postmarketos-boot.img \
   --kernel /tmp/bonito-pm660-usbc-final-7.0.10-sdm670-gaac5fb159b67/Image.gz \
   --dtb /tmp/bonito-pm660-usbc-final-7.0.10-sdm670-gaac5fb159b67/sdm670-google-bonito-sdc.dtb \
   --output /tmp/bonito-pm660-usbc-test.img \
   --keep-workdir
 ```
 
-The validated build produced:
+The patcher's boot-image construction and DTB-appending logic were validated independently before hardware testing.
+
+> **Important:** an early image built from the stale 13,403,442-byte ramdisk was structurally valid and booted the replacement kernel, but it did **not** pass USB peripheral validation because the initramfs was incompatible. That image and its SHA-256 must not be treated as the known-good release image.
+
+The final successful hardware test used a current postmarketOS ramdisk:
 
 ```text
-output:
-  /tmp/bonito-pm660-usbc-test.img
-
-size:
-  24.6 MiB
-
-sha256:
-  15610aeab00bafeb6095f6aa023cdd68e847730df343f25eb77de37f843fc2d6
+ramdisk size: 27688172 bytes
+kernel size:  12414207 bytes
 ```
+
+That generated image then passed both USB role directions on real hardware:
+
+```text
+SINK + DEVICE:
+  UDC state: configured
+  current_speed: high-speed
+  usb0 carrier: 1
+  charging: yes
+
+SOURCE + HOST:
+  usb_role: host
+  pm660-vbus: enabled
+  VBUS users: 1
+  Kingston DataTraveler: enumerated
+
+DETACH:
+  usb_role: device
+  pm660-vbus: disabled
+  VBUS users: 0
+```
+
+No SHA-256 is published here for the final hardware-tested boot image because this repository distributes the source patches and tooling rather than a prebuilt firmware image.
 
 The repacked image was unpacked again and the DTB at the end of the kernel payload was independently verified.
 
@@ -738,6 +782,12 @@ docs/
 ```
 
 It contains the development history, debugging process, implementation details, and captured hardware test results.
+
+---
+
+# Licensing Note
+
+This repository contains Linux kernel patches plus a standalone Python boot-image patching utility. Before redistributing or incorporating the work elsewhere, review the repository's license terms. If the repository does not yet include an explicit `LICENSE` file, add one before broader redistribution so the permissions for the patch set, documentation, and Python utility are unambiguous.
 
 ---
 
