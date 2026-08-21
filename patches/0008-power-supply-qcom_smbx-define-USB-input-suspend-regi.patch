@@ -1,0 +1,28 @@
+From 5d6164bc79ce4c25374b69472aa5f81dd252fa47 Mon Sep 17 00:00:00 2001
+From: Zachary Dry <zach@northbridgetechnology.com>
+Date: Tue, 18 Aug 2026 14:44:16 +0000
+Subject: [PATCH 08/13] power: supply: qcom_smbx: define USB input suspend
+ register
+
+Signed-off-by: Zachary Dry <zach@northbridgetechnology.com>
+---
+ drivers/power/supply/qcom_smbx.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/power/supply/qcom_smbx.c b/drivers/power/supply/qcom_smbx.c
+index 236c5cc41064..34d22b9c6178 100644
+--- a/drivers/power/supply/qcom_smbx.c
++++ b/drivers/power/supply/qcom_smbx.c
+@@ -159,6 +159,9 @@
+ #define OCP_CHARGER_BIT					BIT(1)
+ #define SDP_CHARGER_BIT					BIT(0)
+ 
++#define USBIN_CMD_IL					0x340
++#define USBIN_SUSPEND_BIT				BIT(0)
++
+ #define TYPE_C_STATUS_1					0x30B
+ #define UFP_TYPEC_MASK					GENMASK(7, 5)
+ #define UFP_TYPEC_RDSTD_BIT				BIT(7)
+-- 
+2.43.0
+

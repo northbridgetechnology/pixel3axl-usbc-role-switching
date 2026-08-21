@@ -1,0 +1,69 @@
+From 64fb5a59470c34a9fe73ab4f2ed4259227992b02 Mon Sep 17 00:00:00 2001
+From: Zachary Dry <zach@northbridgetechnology.com>
+Date: Wed, 19 Aug 2026 06:33:00 +0000
+Subject: [PATCH 12/13] usb: typec: qcom: pm660: track VBUS changes in Type-C
+ IRQ
+
+Signed-off-by: Zachary Dry <zach@northbridgetechnology.com>
+---
+ .../tcpm/qcom/qcom_pmic_typec_port_pm660.c    | 31 +++++++++++++++++--
+ 1 file changed, 28 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+index 4939cbe3fbae..bc672a804ef7 100644
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+@@ -80,6 +80,8 @@ struct pm660_typec_port {
+ 
+ 	struct regulator	*vdd_vbus;
+ 	bool			vbus_enabled;
++	bool			vbus_present;
++	bool			vbus_valid;
+ 	struct mutex		lock;
+ };
+ 
+@@ -415,15 +417,38 @@ static int pm660_typec_start_toggling(struct tcpc_dev *tcpc,
+ static irqreturn_t pm660_typec_irq(int irq, void *data)
+ {
+ 	struct pm660_typec_port *port = data;
++	unsigned int status4;
++	bool vbus;
++	bool vbus_changed = false;
+ 
+ 	(void)irq;
+ 
+ 	/*
+-	 * PM660 exposes a single aggregate "type-c-change" IRQ. TCPM will
+-	 * reread the PMIC state through get_cc() and get_vbus().
++	 * PM660 exposes a single aggregate Type-C change interrupt. Always
++	 * notify TCPM of CC changes. Only generate a VBUS event when the
++	 * hardware VBUS state changes, or on the first observation so TCPM
++	 * can establish the initial vSafe0V state.
+ 	 */
+-	if (port->tcpm_port)
++	mutex_lock(&port->lock);
++
++	if (!pm660_typec_read(port, PM660_TYPEC_STATUS_4_REG, &status4)) {
++		vbus = !!(status4 & PM660_TYPEC_VBUS_STATUS);
++
++		if (!port->vbus_valid || vbus != port->vbus_present) {
++			port->vbus_present = vbus;
++			port->vbus_valid = true;
++			vbus_changed = true;
++		}
++	}
++
++	mutex_unlock(&port->lock);
++
++	if (port->tcpm_port) {
++		if (vbus_changed)
++			tcpm_vbus_change(port->tcpm_port);
++
+ 		tcpm_cc_change(port->tcpm_port);
++	}
+ 
+ 	return IRQ_HANDLED;
+ }
+-- 
+2.43.0
+

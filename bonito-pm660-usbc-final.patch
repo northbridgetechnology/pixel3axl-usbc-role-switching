@@ -1,0 +1,1246 @@
+diff --git a/Documentation/devicetree/bindings/power/supply/qcom,pmi8998-charger.yaml b/Documentation/devicetree/bindings/power/supply/qcom,pmi8998-charger.yaml
+index 70f5cd6eaeab..c37dbb860d2b 100644
+--- a/Documentation/devicetree/bindings/power/supply/qcom,pmi8998-charger.yaml
++++ b/Documentation/devicetree/bindings/power/supply/qcom,pmi8998-charger.yaml
+@@ -40,6 +40,14 @@ properties:
+ 
+   monitored-battery: true
+ 
++  vbus:
++    $ref: /schemas/regulator/regulator.yaml#
++    type: object
++    description:
++      Regulator providing VBUS when the charger operates in USB host mode.
++
++    unevaluatedProperties: false
++
+ required:
+   - compatible
+   - reg
+diff --git a/Documentation/devicetree/bindings/usb/qcom,pmic-typec.yaml b/Documentation/devicetree/bindings/usb/qcom,pmic-typec.yaml
+index 6d3fa2bc9cee..f10d8f906844 100644
+--- a/Documentation/devicetree/bindings/usb/qcom,pmic-typec.yaml
++++ b/Documentation/devicetree/bindings/usb/qcom,pmic-typec.yaml
+@@ -16,6 +16,7 @@ properties:
+   compatible:
+     oneOf:
+       - enum:
++          - qcom,pm660-typec
+           - qcom,pmi632-typec
+           - qcom,pm8150b-typec
+       - items:
+@@ -40,43 +41,11 @@ properties:
+ 
+   interrupts:
+     minItems: 8
+-    items:
+-      - description: Type-C CC attach notification, VBUS error, tCCDebounce done
+-      - description: Type-C VCONN powered
+-      - description: Type-C CC state change
+-      - description: Type-C VCONN over-current
+-      - description: Type-C VBUS state change
+-      - description: Type-C Attach/detach notification
+-      - description: Type-C Legacy cable detect
+-      - description: Type-C Try.Src Try.Snk state change
+-      - description: Power Domain Signal TX - HardReset or CableReset signal TX
+-      - description: Power Domain Signal RX - HardReset or CableReset signal RX
+-      - description: Power Domain TX complete
+-      - description: Power Domain RX complete
+-      - description: Power Domain TX fail
+-      - description: Power Domain TX message discard
+-      - description: Power Domain RX message discard
+-      - description: Power Domain Fast Role Swap event
++    maxItems: 16
+ 
+   interrupt-names:
+     minItems: 8
+-    items:
+-      - const: or-rid-detect-change
+-      - const: vpd-detect
+-      - const: cc-state-change
+-      - const: vconn-oc
+-      - const: vbus-change
+-      - const: attach-detach
+-      - const: legacy-cable-detect
+-      - const: try-snk-src-detect
+-      - const: sig-tx
+-      - const: sig-rx
+-      - const: msg-tx
+-      - const: msg-rx
+-      - const: msg-tx-failed
+-      - const: msg-tx-discarded
+-      - const: msg-rx-discarded
+-      - const: fr-swap
++    maxItems: 16
+ 
+   vdd-vbus-supply:
+     description: VBUS power supply.
+@@ -97,29 +66,93 @@ required:
+   - vdd-vbus-supply
+ 
+ allOf:
++  - if:
++      properties:
++        compatible:
++          contains:
++            const: qcom,pm660-typec
++    then:
++      properties:
++        reg:
++          minItems: 2
++          maxItems: 2
++        interrupts:
++          minItems: 8
++          maxItems: 8
++        interrupt-names:
++          items:
++            - const: type-c-change
++            - const: sig-tx
++            - const: sig-rx
++            - const: msg-tx
++            - const: msg-rx
++            - const: msg-tx-failed
++            - const: msg-tx-discarded
++            - const: msg-rx-discarded
++      required:
++        - vdd-pdphy-supply
++
+   - if:
+       properties:
+         compatible:
+           contains:
+             enum:
+               - qcom,pmi632-typec
++              - qcom,pm4125-typec
+     then:
+       properties:
+         reg:
+           maxItems: 1
+         interrupts:
++          minItems: 8
+           maxItems: 8
+         interrupt-names:
+-          maxItems: 8
++          items:
++            - const: or-rid-detect-change
++            - const: vpd-detect
++            - const: cc-state-change
++            - const: vconn-oc
++            - const: vbus-change
++            - const: attach-detach
++            - const: legacy-cable-detect
++            - const: try-snk-src-detect
+         vdd-pdphy-supply: false
+-    else:
++
++  - if:
++      not:
++        properties:
++          compatible:
++            contains:
++              enum:
++                - qcom,pm660-typec
++                - qcom,pmi632-typec
++                - qcom,pm4125-typec
++    then:
+       properties:
+         reg:
++          minItems: 2
+           maxItems: 2
+         interrupts:
+           minItems: 16
+-        interrupt-names:
+           maxItems: 16
++        interrupt-names:
++          items:
++            - const: or-rid-detect-change
++            - const: vpd-detect
++            - const: cc-state-change
++            - const: vconn-oc
++            - const: vbus-change
++            - const: attach-detach
++            - const: legacy-cable-detect
++            - const: try-snk-src-detect
++            - const: sig-tx
++            - const: sig-rx
++            - const: msg-tx
++            - const: msg-rx
++            - const: msg-tx-failed
++            - const: msg-tx-discarded
++            - const: msg-rx-discarded
++            - const: fr-swap
+       required:
+         - vdd-pdphy-supply
+ 
+diff --git a/arch/arm64/boot/dts/qcom/pm660.dtsi b/arch/arm64/boot/dts/qcom/pm660.dtsi
+index a27ed5c63018..d831d0efcb14 100644
+--- a/arch/arm64/boot/dts/qcom/pm660.dtsi
++++ b/arch/arm64/boot/dts/qcom/pm660.dtsi
+@@ -34,7 +34,7 @@ pm660_crit: pm660-crit {
+ };
+ 
+ &spmi_bus {
+-	pmic@0 {
++	pm660_0: pmic@0 {
+ 		compatible = "qcom,pm660", "qcom,spmi-pmic";
+ 		reg = <0x0 SPMI_USID>;
+ 		#address-cells = <1>;
+diff --git a/arch/arm64/boot/dts/qcom/sdm670-google-common.dtsi b/arch/arm64/boot/dts/qcom/sdm670-google-common.dtsi
+index aad17eed0c35..05674ab644fe 100644
+--- a/arch/arm64/boot/dts/qcom/sdm670-google-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm670-google-common.dtsi
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/sound/qcom,q6afe.h>
+ #include <dt-bindings/sound/qcom,q6asm.h>
+ #include <dt-bindings/sound/qcom,q6voice.h>
++#include <dt-bindings/usb/pd.h>
+ #include "sdm670.dtsi"
+ #include "pm660.dtsi"
+ #include "pm660l.dtsi"
+@@ -1124,6 +1125,72 @@ msm-therm@1 {
+ &pm660_charger {
+ 	monitored-battery = <&battery>;
+ 	status = "okay";
++
++	pm660_vbus: vbus {
++		regulator-name = "pm660-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++};
++
++&pm660_0 {
++	pm660_typec: typec@1300 {
++		compatible = "qcom,pm660-typec";
++		reg = <0x1300>, <0x1700>;
++
++		interrupts = <0x0 0x13 0x7 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x0 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x1 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x2 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x3 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x4 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x5 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x6 IRQ_TYPE_EDGE_RISING>;
++
++		interrupt-names = "type-c-change",
++				  "sig-tx",
++				  "sig-rx",
++				  "msg-tx",
++				  "msg-rx",
++				  "msg-tx-failed",
++				  "msg-tx-discarded",
++				  "msg-rx-discarded";
++
++		vdd-pdphy-supply = <&vreg_l7b_3p125>;
++
++		connector {
++			compatible = "usb-c-connector";
++			label = "USB-C";
++
++			power-role = "dual";
++			data-role = "dual";
++			try-power-role = "sink";
++
++			vbus-supply = <&pm660_vbus>;
++
++			source-pdos = <PDO_FIXED(5000, 900,
++				       PDO_FIXED_DUAL_ROLE |
++				       PDO_FIXED_USB_COMM |
++				       PDO_FIXED_DATA_SWAP)>;
++
++			sink-pdos = <PDO_FIXED(5000, 3000,
++				     PDO_FIXED_DUAL_ROLE |
++				     PDO_FIXED_USB_COMM |
++				     PDO_FIXED_DATA_SWAP)
++				     PDO_FIXED(9000, 3000,
++				     PDO_FIXED_DUAL_ROLE |
++				     PDO_FIXED_USB_COMM |
++				     PDO_FIXED_DATA_SWAP)>;
++
++			op-sink-microwatt = <2500000>;
++
++			port {
++				pm660_typec_hs_in: endpoint {
++					remote-endpoint = <&usb_1_dwc3_hs_out>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &pm660_fg {
+@@ -1524,13 +1591,19 @@ &usb_1 {
+ };
+ 
+ &usb_1_dwc3 {
+-	/* Only peripheral works for now */
+-	dr_mode = "peripheral";
++	dr_mode = "otg";
++	usb-role-switch;
+ 
+ 	/* Do not assume that sdm670.dtsi will never support USB 3.0 */
+ 	phys = <&usb_1_hsphy>;
+ 	phy-names = "usb2-phy";
+ 	maximum-speed = "high-speed";
++
++	port {
++		usb_1_dwc3_hs_out: endpoint {
++			remote-endpoint = <&pm660_typec_hs_in>;
++		};
++	};
+ };
+ 
+ &venus {
+diff --git a/drivers/power/supply/qcom_smbx.c b/drivers/power/supply/qcom_smbx.c
+index 3b3bb28a5fe2..c50a9560c57a 100644
+--- a/drivers/power/supply/qcom_smbx.c
++++ b/drivers/power/supply/qcom_smbx.c
+@@ -9,6 +9,7 @@
+  */
+ 
+ #include <linux/bits.h>
++#include <linux/delay.h>
+ #include <linux/devm-helpers.h>
+ #include <linux/iio/consumer.h>
+ #include <linux/interrupt.h>
+@@ -20,6 +21,7 @@
+ #include <linux/of.h>
+ #include <linux/power_supply.h>
+ #include <linux/regmap.h>
++#include <linux/regulator/driver.h>
+ #include <linux/types.h>
+ #include <linux/workqueue.h>
+ #include <linux/thermal.h>
+@@ -114,6 +116,28 @@
+ #define OTG_ENG_OTG_CFG					0x1C0
+ #define ENG_BUCKBOOST_HALT1_8_MODE_BIT			BIT(0)
+ 
++#define OTG_STATUS					0x109
++#define BOOST_SOFTSTART_DONE_BIT			BIT(3)
++
++#define CMD_OTG						0x140
++#define OTG_EN_BIT					BIT(0)
++
++#define OTG_CURRENT_LIMIT_CFG				0x152
++#define OTG_CURRENT_LIMIT_MASK				GENMASK(2, 0)
++
++#define DC_ENG_SSUPPLY_CFG2				0x4C1
++#define ENG_SSUPPLY_IVREF_OTG_SS_MASK			GENMASK(2, 0)
++#define OTG_SS_SLOW					0x3
++
++#define OTG_CURRENT_MIN_UA				250000
++#define OTG_CURRENT_MAX_UA				2000000
++#define OTG_CURRENT_STEP_UA				250000
++#define OTG_CURRENT_DEFAULT_UA				1500000
++
++#define OTG_MAX_RETRIES					15
++#define OTG_MIN_DELAY_US				2000
++#define OTG_MAX_DELAY_US				9000
++
+ #define APSD_STATUS					0x307
+ #define APSD_STATUS_7_BIT				BIT(7)
+ #define HVDCP_CHECK_TIMEOUT_BIT				BIT(6)
+@@ -135,6 +159,9 @@
+ #define OCP_CHARGER_BIT					BIT(1)
+ #define SDP_CHARGER_BIT					BIT(0)
+ 
++#define USBIN_CMD_IL					0x340
++#define USBIN_SUSPEND_BIT				BIT(0)
++
+ #define TYPE_C_STATUS_1					0x30B
+ #define UFP_TYPEC_MASK					GENMASK(7, 5)
+ #define UFP_TYPEC_RDSTD_BIT				BIT(7)
+@@ -578,6 +605,178 @@ static int smb_set_current_limit(struct smb_chip *chip, unsigned int val)
+ 			    val_raw);
+ }
+ 
++
++static int smb_set_otg_current_limit(struct smb_chip *chip, unsigned int ua)
++{
++	unsigned int raw;
++
++	if (ua < OTG_CURRENT_MIN_UA || ua > OTG_CURRENT_MAX_UA ||
++	    (ua - OTG_CURRENT_MIN_UA) % OTG_CURRENT_STEP_UA)
++		return -EINVAL;
++
++	raw = (ua - OTG_CURRENT_MIN_UA) / OTG_CURRENT_STEP_UA;
++
++	return regmap_update_bits(chip->regmap,
++				  chip->base + OTG_CURRENT_LIMIT_CFG,
++				  OTG_CURRENT_LIMIT_MASK, raw);
++}
++
++static int smb_enable_otg_wa(struct smb_chip *chip)
++{
++	static const unsigned int startup_current_ua[] = {
++		250000, 500000, 1000000, 1500000,
++	};
++	unsigned int status, delay;
++	int ret, i, retry;
++
++	for (i = 0; i < ARRAY_SIZE(startup_current_ua); i++) {
++		ret = smb_set_otg_current_limit(chip, startup_current_ua[i]);
++		if (ret)
++			return ret;
++
++		ret = regmap_write(chip->regmap, chip->base + CMD_OTG, OTG_EN_BIT);
++		if (ret)
++			return ret;
++
++		for (retry = 0; retry < OTG_MAX_RETRIES; retry++) {
++			delay = retry > 5 ? OTG_MAX_DELAY_US : OTG_MIN_DELAY_US;
++			usleep_range(delay, delay + 100);
++
++			ret = regmap_read(chip->regmap, chip->base + OTG_STATUS,
++					  &status);
++			if (ret)
++				goto disable_otg;
++
++			if (status & BOOST_SOFTSTART_DONE_BIT)
++				return smb_set_otg_current_limit(
++						chip, OTG_CURRENT_DEFAULT_UA);
++		}
++
++		ret = regmap_write(chip->regmap, chip->base + CMD_OTG, 0);
++		if (ret)
++			return ret;
++	}
++
++	return -ETIMEDOUT;
++
++disable_otg:
++	regmap_write(chip->regmap, chip->base + CMD_OTG, 0);
++	return ret;
++}
++
++static int smb_vbus_enable(struct regulator_dev *rdev)
++{
++	struct smb_chip *chip = rdev_get_drvdata(rdev);
++	int ret;
++
++	ret = regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
++				 USBIN_SUSPEND_BIT, USBIN_SUSPEND_BIT);
++	if (ret)
++		return ret;
++
++	ret = regmap_update_bits(chip->regmap,
++				 chip->base + OTG_ENG_OTG_CFG,
++				 ENG_BUCKBOOST_HALT1_8_MODE_BIT,
++				 ENG_BUCKBOOST_HALT1_8_MODE_BIT);
++	if (ret)
++		goto resume_usbin;
++
++	ret = smb_enable_otg_wa(chip);
++	if (ret)
++		goto restore_halt_mode;
++
++	return 0;
++
++restore_halt_mode:
++	regmap_update_bits(chip->regmap, chip->base + OTG_ENG_OTG_CFG,
++			   ENG_BUCKBOOST_HALT1_8_MODE_BIT, 0);
++resume_usbin:
++	regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
++			   USBIN_SUSPEND_BIT, 0);
++
++	return ret;
++}
++
++static int smb_vbus_disable(struct regulator_dev *rdev)
++{
++	struct smb_chip *chip = rdev_get_drvdata(rdev);
++	int ret, rc;
++
++	ret = smb_set_otg_current_limit(chip, OTG_CURRENT_MIN_UA);
++
++	rc = regmap_write(chip->regmap, chip->base + CMD_OTG, 0);
++	if (!ret && rc)
++		ret = rc;
++
++	rc = regmap_update_bits(chip->regmap, chip->base + OTG_ENG_OTG_CFG,
++				 ENG_BUCKBOOST_HALT1_8_MODE_BIT, 0);
++	if (!ret && rc)
++		ret = rc;
++
++	rc = regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
++				 USBIN_SUSPEND_BIT, 0);
++	if (!ret && rc)
++		ret = rc;
++
++	return ret;
++}
++
++static int smb_vbus_is_enabled(struct regulator_dev *rdev)
++{
++	struct smb_chip *chip = rdev_get_drvdata(rdev);
++	unsigned int val;
++	int ret;
++
++	ret = regmap_read(chip->regmap, chip->base + CMD_OTG, &val);
++	if (ret)
++		return ret;
++
++	return !!(val & OTG_EN_BIT);
++}
++
++static const struct regulator_ops smb_vbus_reg_ops = {
++	.enable = smb_vbus_enable,
++	.disable = smb_vbus_disable,
++	.is_enabled = smb_vbus_is_enabled,
++};
++
++static const struct regulator_desc smb_vbus_reg_desc = {
++	.owner = THIS_MODULE,
++	.type = REGULATOR_VOLTAGE,
++	.ops = &smb_vbus_reg_ops,
++	.of_match = "vbus",
++	.name = "qcom,smb2-vbus",
++	.fixed_uV = 5000000,
++	.n_voltages = 1,
++};
++
++static int smb_register_vbus_regulator(struct smb_chip *chip)
++{
++	struct regulator_config config = {};
++	struct regulator_dev *rdev;
++	int ret;
++
++	ret = regmap_update_bits(chip->regmap, chip->base + DC_ENG_SSUPPLY_CFG2,
++				 ENG_SSUPPLY_IVREF_OTG_SS_MASK, OTG_SS_SLOW);
++	if (ret)
++		return ret;
++
++	ret = smb_set_otg_current_limit(chip, OTG_CURRENT_MIN_UA);
++	if (ret)
++		return ret;
++
++	config.dev = chip->dev;
++	config.driver_data = chip;
++	config.regmap = chip->regmap;
++
++	rdev = devm_regulator_register(chip->dev, &smb_vbus_reg_desc, &config);
++	if (IS_ERR(rdev))
++		return dev_err_probe(chip->dev, PTR_ERR(rdev),
++				     "failed to register VBUS regulator\n");
++
++	return 0;
++}
++
+ static void smb_status_change_work(struct work_struct *work)
+ {
+ 	unsigned int charger_type, current_ua;
+@@ -1082,6 +1281,21 @@ static int smb_probe(struct platform_device *pdev)
+ 	if (rc < 0)
+ 		return rc;
+ 
++
++	if (of_device_is_compatible(chip->dev->of_node, "qcom,pm660-charger")) {
++		struct device_node *vbus_node;
++
++		vbus_node = of_get_child_by_name(chip->dev->of_node,
++						 "vbus");
++		if (vbus_node) {
++			of_node_put(vbus_node);
++
++			rc = smb_register_vbus_regulator(chip);
++			if (rc < 0)
++				return rc;
++		}
++	}
++
+ 	supply_config.drv_data = chip;
+ 	supply_config.fwnode = dev_fwnode(&pdev->dev);
+ 
+diff --git a/drivers/usb/typec/tcpm/qcom/Makefile b/drivers/usb/typec/tcpm/qcom/Makefile
+index cc23042b9487..370902d4b2b4 100644
+--- a/drivers/usb/typec/tcpm/qcom/Makefile
++++ b/drivers/usb/typec/tcpm/qcom/Makefile
+@@ -3,5 +3,6 @@
+ obj-$(CONFIG_TYPEC_QCOM_PMIC)		+= qcom_pmic_tcpm.o
+ qcom_pmic_tcpm-y			+= qcom_pmic_typec.o \
+ 					   qcom_pmic_typec_port.o \
++					   qcom_pmic_typec_port_pm660.o \
+ 					   qcom_pmic_typec_pdphy.o \
+ 					   qcom_pmic_typec_pdphy_stub.o \
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.c b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.c
+index 3766790c1548..68203c3ba58e 100644
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.c
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.c
+@@ -23,10 +23,17 @@
+ #include "qcom_pmic_typec.h"
+ #include "qcom_pmic_typec_pdphy.h"
+ #include "qcom_pmic_typec_port.h"
++#include "qcom_pmic_typec_port_pm660.h"
++
++typedef int (*pmic_typec_port_probe_fn)(struct platform_device *pdev,
++					struct pmic_typec *tcpm,
++					const struct pmic_typec_port_resources *res,
++					struct regmap *regmap, u32 base);
+ 
+ struct pmic_typec_resources {
+ 	const struct pmic_typec_pdphy_resources	*pdphy_res;
+ 	const struct pmic_typec_port_resources	*port_res;
++	pmic_typec_port_probe_fn			port_probe;
+ };
+ 
+ static int qcom_pmic_typec_init(struct tcpc_dev *tcpc)
+@@ -66,8 +73,7 @@ static int qcom_pmic_typec_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = qcom_pmic_typec_port_probe(pdev, tcpm,
+-					 res->port_res, regmap, base);
++	ret = res->port_probe(pdev, tcpm, res->port_res, regmap, base);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -143,14 +149,23 @@ static void qcom_pmic_typec_remove(struct platform_device *pdev)
+ static const struct pmic_typec_resources pm8150b_typec_res = {
+ 	.pdphy_res = &pm8150b_pdphy_res,
+ 	.port_res = &pm8150b_port_res,
++	.port_probe = qcom_pmic_typec_port_probe,
+ };
+ 
+ static const struct pmic_typec_resources pmi632_typec_res = {
+ 	/* PD PHY not present */
+ 	.port_res = &pm8150b_port_res,
++	.port_probe = qcom_pmic_typec_port_probe,
++};
++
++static const struct pmic_typec_resources pm660_typec_res = {
++	.pdphy_res = &pm8150b_pdphy_res,
++	.port_res = &pm660_port_res,
++	.port_probe = qcom_pmic_typec_pm660_port_probe,
+ };
+ 
+ static const struct of_device_id qcom_pmic_typec_table[] = {
++	{ .compatible = "qcom,pm660-typec", .data = &pm660_typec_res },
+ 	{ .compatible = "qcom,pm8150b-typec", .data = &pm8150b_typec_res },
+ 	{ .compatible = "qcom,pmi632-typec", .data = &pmi632_typec_res },
+ 	{ }
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h
+index 3c75820c9187..da2f858f3640 100644
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h
+@@ -12,6 +12,7 @@ struct pmic_typec {
+ 	struct tcpc_dev		tcpc;
+ 	struct pmic_typec_pdphy	*pmic_typec_pdphy;
+ 	struct pmic_typec_port	*pmic_typec_port;
++	void			*port_priv;
+ 
+ 	int (*pdphy_start)(struct pmic_typec *tcpm,
+ 			   struct tcpm_port *tcpm_port);
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+new file mode 100644
+index 000000000000..f2f162cb3664
+--- /dev/null
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+@@ -0,0 +1,586 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Qualcomm PM660 USBIN Type-C port backend
++ *
++ * PM660 predates the standalone PM8150B-style Type-C register block.
++ * Its CC/role controls live in the USBIN peripheral, while the PD PHY
++ * is a separate PMIC peripheral.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
++#include <linux/slab.h>
++#include <linux/usb/tcpm.h>
++
++#include "qcom_pmic_typec.h"
++#include "qcom_pmic_typec_port.h"
++#include "qcom_pmic_typec_port_pm660.h"
++
++/* PM660 peripheral bases */
++#define PM660_USBIN_BASE				0x1300
++#define PM660_MISC_BASE					0x1600
++
++/* USBIN Type-C status */
++#define PM660_TYPEC_STATUS_1_REG				0x0b
++#define PM660_UFP_TYPEC_RDSTD				BIT(7)
++#define PM660_UFP_TYPEC_RD1P5				BIT(6)
++#define PM660_UFP_TYPEC_RD3P0				BIT(5)
++
++#define PM660_TYPEC_STATUS_2_REG				0x0c
++#define PM660_DFP_TYPEC_MASK				GENMASK(3, 0)
++#define PM660_DFP_RD_OPEN				BIT(3)
++#define PM660_DFP_RD_RA_VCONN				BIT(2)
++#define PM660_DFP_RD_RD					BIT(1)
++#define PM660_DFP_RA_RA					BIT(0)
++
++#define PM660_TYPEC_STATUS_4_REG				0x0e
++#define PM660_UFP_DFP_MODE_STATUS			BIT(7)
++#define PM660_TYPEC_VBUS_STATUS				BIT(6)
++#define PM660_CC_ORIENTATION				BIT(1)
++#define PM660_CC_ATTACHED				BIT(0)
++
++/* USBIN Type-C configuration */
++#define PM660_TYPEC_CFG_REG				0x58
++#define PM660_TYPEC_OR_U_USB				BIT(0)
++
++#define PM660_TYPEC_CFG_2_REG				0x59
++#define PM660_EN_TRY_SOURCE_MODE				BIT(3)
++#define PM660_EN_80UA_180UA_CUR_SOURCE			BIT(0)
++
++#define PM660_TYPEC_CFG_3_REG				0x5a
++#define PM660_EN_TRYSINK_MODE				BIT(2)
++
++#define PM660_TYPEC_INTRPT_ENB_REG			0x67
++#define PM660_CCSTATE_CHANGE_INT_EN			BIT(2)
++
++#define PM660_TYPEC_SW_CTRL_REG				0x68
++#define PM660_VCONN_EN_ORIENTATION			BIT(6)
++#define PM660_VCONN_EN_SRC				BIT(4)
++#define PM660_VCONN_EN_VALUE				BIT(3)
++#define PM660_POWER_ROLE_CMD_MASK			GENMASK(2, 0)
++#define PM660_UFP_EN_CMD				BIT(2)
++#define PM660_DFP_EN_CMD				BIT(1)
++#define PM660_TYPEC_DISABLE_CMD				BIT(0)
++
++/* PM660 TYPEC_PBS_WA_BIT workaround used by the downstream SMB2 driver. */
++#define PM660_TM_IO_DTEST4_SEL				0xe9
++#define PM660_PBS_CRUDE_SENSOR_ENABLE			0xa5
++
++struct pm660_typec_port {
++	struct device		*dev;
++	struct tcpm_port	*tcpm_port;
++	struct regmap		*regmap;
++	u32			base;
++	int			irq;
++
++	struct regulator	*vdd_vbus;
++	bool			vbus_enabled;
++	bool			vbus_present;
++	bool			vbus_valid;
++	struct mutex		lock;
++};
++
++const struct pmic_typec_port_resources pm660_port_res = {
++	.nr_irqs = 1,
++	.irq_params = {
++		{
++			.virq = 0,
++			.irq_name = "type-c-change",
++		},
++	},
++};
++
++static int pm660_typec_read(struct pm660_typec_port *port,
++			    unsigned int reg, unsigned int *val)
++{
++	return regmap_read(port->regmap, port->base + reg, val);
++}
++
++static int pm660_typec_pbs_wa(struct pm660_typec_port *port, bool sink)
++{
++	unsigned int reg = PM660_MISC_BASE + PM660_TM_IO_DTEST4_SEL;
++	unsigned int val = sink ? 0 : PM660_PBS_CRUDE_SENSOR_ENABLE;
++	int ret;
++
++	ret = regmap_write(port->regmap, reg, val);
++	if (ret)
++		dev_warn(port->dev, "failed to update PM660 Type-C PBS workaround: %d\n",
++			 ret);
++
++	/*
++	 * The downstream driver treats failure of this workaround write as
++	 * non-fatal and continues with the role transition.
++	 */
++	return 0;
++}
++
++static int pm660_typec_set_power_role(struct pm660_typec_port *port,
++				      unsigned int role)
++{
++	int ret;
++
++	pm660_typec_pbs_wa(port, role == PM660_UFP_EN_CMD);
++
++	ret = regmap_update_bits(port->regmap,
++				 port->base + PM660_TYPEC_SW_CTRL_REG,
++				 PM660_POWER_ROLE_CMD_MASK, role);
++	if (ret)
++		dev_err(port->dev, "failed to set Type-C power role: %d\n", ret);
++
++	return ret;
++}
++
++static int pm660_typec_get_vbus(struct tcpc_dev *tcpc)
++{
++	struct pmic_typec *tcpm = tcpc_to_tcpm(tcpc);
++	struct pm660_typec_port *port = tcpm->port_priv;
++	unsigned int status;
++	int ret;
++
++	mutex_lock(&port->lock);
++	ret = pm660_typec_read(port, PM660_TYPEC_STATUS_4_REG, &status);
++	if (!ret)
++		ret = port->vbus_enabled || !!(status & PM660_TYPEC_VBUS_STATUS);
++	mutex_unlock(&port->lock);
++
++	return ret;
++}
++
++static int pm660_typec_set_vbus(struct tcpc_dev *tcpc, bool on, bool sink)
++{
++	struct pmic_typec *tcpm = tcpc_to_tcpm(tcpc);
++	struct pm660_typec_port *port = tcpm->port_priv;
++	bool changed = false;
++	int ret = 0;
++
++	(void)sink;
++
++	mutex_lock(&port->lock);
++
++	if (port->vbus_enabled == on)
++		goto out;
++
++	if (on)
++		ret = regulator_enable(port->vdd_vbus);
++	else
++		ret = regulator_disable(port->vdd_vbus);
++
++	if (!ret) {
++		port->vbus_enabled = on;
++		changed = true;
++	}
++
++out:
++	mutex_unlock(&port->lock);
++
++	/*
++	 * set_vbus() may run during tcpm_register_port() before port_start()
++	 * provides tcpm_port. Once registered, notify TCPM whenever the
++	 * source regulator actually changes state. get_vbus() also accounts
++	 * for vbus_enabled when PM660 does not reflect sourced VBUS in
++	 * TYPEC_VBUS_STATUS.
++	 */
++	if (changed && port->tcpm_port)
++		tcpm_vbus_change(port->tcpm_port);
++
++	return ret;
++}
++
++static int pm660_typec_get_cc(struct tcpc_dev *tcpc,
++			      enum typec_cc_status *cc1,
++			      enum typec_cc_status *cc2)
++{
++	struct pmic_typec *tcpm = tcpc_to_tcpm(tcpc);
++	struct pm660_typec_port *port = tcpm->port_priv;
++	enum typec_cc_status active = TYPEC_CC_OPEN;
++	unsigned int status1, status2, status4;
++	bool orientation_cc2;
++	int ret;
++
++	*cc1 = TYPEC_CC_OPEN;
++	*cc2 = TYPEC_CC_OPEN;
++
++	mutex_lock(&port->lock);
++
++	ret = pm660_typec_read(port, PM660_TYPEC_STATUS_4_REG, &status4);
++	if (ret)
++		goto out;
++
++	if (!(status4 & PM660_CC_ATTACHED))
++		goto out;
++
++	ret = pm660_typec_read(port, PM660_TYPEC_STATUS_1_REG, &status1);
++	if (ret)
++		goto out;
++
++	ret = pm660_typec_read(port, PM660_TYPEC_STATUS_2_REG, &status2);
++	if (ret)
++		goto out;
++
++	orientation_cc2 = !!(status4 & PM660_CC_ORIENTATION);
++
++	if (status4 & PM660_UFP_DFP_MODE_STATUS) {
++		/* Local port is DFP/source; decode the partner's Rd/Ra. */
++		switch (status2 & PM660_DFP_TYPEC_MASK) {
++		case PM660_DFP_RA_RA:
++			*cc1 = TYPEC_CC_RA;
++			*cc2 = TYPEC_CC_RA;
++			goto out;
++		case PM660_DFP_RD_RD:
++			*cc1 = TYPEC_CC_RD;
++			*cc2 = TYPEC_CC_RD;
++			goto out;
++		case PM660_DFP_RD_RA_VCONN:
++			active = TYPEC_CC_RD;
++			*cc1 = TYPEC_CC_RA;
++			*cc2 = TYPEC_CC_RA;
++			break;
++		case PM660_DFP_RD_OPEN:
++			active = TYPEC_CC_RD;
++			break;
++		default:
++			dev_dbg(port->dev, "unhandled PM660 DFP status %#x\n",
++				status2);
++			goto out;
++		}
++	} else {
++		/* Local port is UFP/sink; decode the partner's advertised Rp. */
++		switch (status1) {
++		case PM660_UFP_TYPEC_RDSTD:
++			active = TYPEC_CC_RP_DEF;
++			break;
++		case PM660_UFP_TYPEC_RD1P5:
++			active = TYPEC_CC_RP_1_5;
++			break;
++		case PM660_UFP_TYPEC_RD3P0:
++			active = TYPEC_CC_RP_3_0;
++			break;
++		default:
++			dev_dbg(port->dev, "unhandled PM660 UFP status %#x\n",
++				status1);
++			goto out;
++		}
++	}
++
++	if (orientation_cc2)
++		*cc2 = active;
++	else
++		*cc1 = active;
++
++out:
++	mutex_unlock(&port->lock);
++	return ret;
++}
++
++static int pm660_typec_set_cc(struct tcpc_dev *tcpc,
++			      enum typec_cc_status cc)
++{
++	struct pmic_typec *tcpm = tcpc_to_tcpm(tcpc);
++	struct pm660_typec_port *port = tcpm->port_priv;
++	unsigned int role;
++	unsigned int rp_current = 0;
++	int ret;
++
++	switch (cc) {
++	case TYPEC_CC_OPEN:
++		role = PM660_TYPEC_DISABLE_CMD;
++		break;
++	case TYPEC_CC_RD:
++		role = PM660_UFP_EN_CMD;
++		break;
++	case TYPEC_CC_RP_DEF:
++		role = PM660_DFP_EN_CMD;
++		rp_current = 0;
++		break;
++	case TYPEC_CC_RP_1_5:
++		role = PM660_DFP_EN_CMD;
++		rp_current = PM660_EN_80UA_180UA_CUR_SOURCE;
++		break;
++	case TYPEC_CC_RP_3_0:
++		/*
++		 * The downstream PM660 role setter only distinguishes the
++		 * default and 1.5 A source-current modes. Do not invent a
++		 * 3.0 A encoding here.
++		 */
++		return -EOPNOTSUPP;
++	default:
++		return -EINVAL;
++	}
++
++	mutex_lock(&port->lock);
++
++	if (role == PM660_DFP_EN_CMD) {
++		ret = regmap_update_bits(port->regmap,
++					 port->base + PM660_TYPEC_CFG_2_REG,
++					 PM660_EN_80UA_180UA_CUR_SOURCE,
++					 rp_current);
++		if (ret)
++			goto out;
++	}
++
++	ret = pm660_typec_set_power_role(port, role);
++
++out:
++	mutex_unlock(&port->lock);
++	return ret;
++}
++
++static int pm660_typec_set_polarity(struct tcpc_dev *tcpc,
++				    enum typec_cc_polarity polarity)
++{
++	(void)tcpc;
++	(void)polarity;
++
++	/* USB PHY orientation is handled outside this PMIC Type-C block. */
++	return 0;
++}
++
++static int pm660_typec_set_vconn(struct tcpc_dev *tcpc, bool on)
++{
++	struct pmic_typec *tcpm = tcpc_to_tcpm(tcpc);
++	struct pm660_typec_port *port = tcpm->port_priv;
++	unsigned int status4, orientation, mask, val;
++	int ret;
++
++	mutex_lock(&port->lock);
++
++	ret = pm660_typec_read(port, PM660_TYPEC_STATUS_4_REG, &status4);
++	if (ret)
++		goto out;
++
++	/* VCONN is driven on the inactive CC pin. */
++	orientation = (status4 & PM660_CC_ORIENTATION) ?
++		      0 : PM660_VCONN_EN_ORIENTATION;
++
++	if (on) {
++		mask = PM660_VCONN_EN_ORIENTATION | PM660_VCONN_EN_VALUE;
++		val = orientation | PM660_VCONN_EN_VALUE;
++	} else {
++		mask = PM660_VCONN_EN_VALUE;
++		val = 0;
++	}
++
++	ret = regmap_update_bits(port->regmap,
++				 port->base + PM660_TYPEC_SW_CTRL_REG,
++				 mask, val);
++
++out:
++	mutex_unlock(&port->lock);
++	return ret;
++}
++
++static int pm660_typec_start_toggling(struct tcpc_dev *tcpc,
++				      enum typec_port_type port_type,
++				      enum typec_cc_status cc)
++{
++	struct pmic_typec *tcpm = tcpc_to_tcpm(tcpc);
++	struct pm660_typec_port *port = tcpm->port_priv;
++	unsigned int role;
++	unsigned int try_src = 0;
++	unsigned int try_snk = 0;
++	int ret;
++
++	(void)cc;
++
++	switch (port_type) {
++	case TYPEC_PORT_SRC:
++		role = PM660_DFP_EN_CMD;
++		break;
++	case TYPEC_PORT_SNK:
++		role = PM660_UFP_EN_CMD;
++		break;
++	case TYPEC_PORT_DRP:
++		role = 0;
++		/*
++		 * Bonito's downstream policy is sink-preferred. Keep hardware
++		 * Try.SNK enabled while TCPM owns the policy state machine.
++		 */
++		try_snk = PM660_EN_TRYSINK_MODE;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	mutex_lock(&port->lock);
++
++	ret = regmap_update_bits(port->regmap,
++				 port->base + PM660_TYPEC_CFG_2_REG,
++				 PM660_EN_TRY_SOURCE_MODE, try_src);
++	if (ret)
++		goto out;
++
++	ret = regmap_update_bits(port->regmap,
++				 port->base + PM660_TYPEC_CFG_3_REG,
++				 PM660_EN_TRYSINK_MODE, try_snk);
++	if (ret)
++		goto out;
++
++	ret = pm660_typec_set_power_role(port, role);
++
++out:
++	mutex_unlock(&port->lock);
++	return ret;
++}
++
++static irqreturn_t pm660_typec_irq(int irq, void *data)
++{
++	struct pm660_typec_port *port = data;
++	unsigned int status4;
++	bool vbus;
++	bool vbus_changed = false;
++
++	(void)irq;
++
++	/*
++	 * PM660 exposes a single aggregate Type-C change interrupt. Always
++	 * notify TCPM of CC changes. Only generate a VBUS event when the
++	 * hardware VBUS state changes, or on the first observation so TCPM
++	 * can establish the initial vSafe0V state.
++	 */
++	mutex_lock(&port->lock);
++
++	if (!pm660_typec_read(port, PM660_TYPEC_STATUS_4_REG, &status4)) {
++		vbus = !!(status4 & PM660_TYPEC_VBUS_STATUS);
++
++		if (!port->vbus_valid || vbus != port->vbus_present) {
++			port->vbus_present = vbus;
++			port->vbus_valid = true;
++			vbus_changed = true;
++		}
++	}
++
++	mutex_unlock(&port->lock);
++
++	if (port->tcpm_port) {
++		if (vbus_changed)
++			tcpm_vbus_change(port->tcpm_port);
++
++		tcpm_cc_change(port->tcpm_port);
++	}
++
++	return IRQ_HANDLED;
++}
++
++static int pm660_typec_port_start(struct pmic_typec *tcpm,
++				  struct tcpm_port *tcpm_port)
++{
++	struct pm660_typec_port *port = tcpm->port_priv;
++	unsigned int irq_mask;
++	int ret;
++
++	/*
++	 * TYPE_C_OR_U_USB == 0 selects the Type-C state machine on PM660.
++	 */
++	ret = regmap_update_bits(port->regmap,
++				 port->base + PM660_TYPEC_CFG_REG,
++				 PM660_TYPEC_OR_U_USB, 0);
++	if (ret)
++		return ret;
++
++	/*
++	 * PM660 exposes a single aggregate type-c-change interrupt.
++	 * The downstream SMB2 implementation enables only CC state
++	 * changes as the trigger for this interrupt.
++	 */
++	irq_mask = PM660_CCSTATE_CHANGE_INT_EN;
++
++	ret = regmap_write(port->regmap,
++			   port->base + PM660_TYPEC_INTRPT_ENB_REG,
++			   irq_mask);
++	if (ret)
++		return ret;
++
++	/* Select software control for VCONN, initially disabled. */
++	ret = regmap_update_bits(port->regmap,
++				 port->base + PM660_TYPEC_SW_CTRL_REG,
++				 PM660_VCONN_EN_SRC | PM660_VCONN_EN_VALUE,
++				 PM660_VCONN_EN_SRC);
++	if (ret)
++		return ret;
++
++	port->tcpm_port = tcpm_port;
++	enable_irq(port->irq);
++
++	return 0;
++}
++
++static void pm660_typec_port_stop(struct pmic_typec *tcpm)
++{
++	struct pm660_typec_port *port = tcpm->port_priv;
++
++	disable_irq(port->irq);
++	port->tcpm_port = NULL;
++}
++
++int qcom_pmic_typec_pm660_port_probe(struct platform_device *pdev,
++				      struct pmic_typec *tcpm,
++				      const struct pmic_typec_port_resources *res,
++				      struct regmap *regmap,
++				      u32 base)
++{
++	struct device *dev = &pdev->dev;
++	struct pm660_typec_port *port;
++	struct fwnode_handle *connector;
++	int ret;
++
++	if (!res || res->nr_irqs != 1)
++		return -EINVAL;
++
++	if (base != PM660_USBIN_BASE)
++		dev_warn(dev, "unexpected PM660 USBIN base %#x\n", base);
++
++	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
++	if (!port)
++		return -ENOMEM;
++
++	connector = device_get_named_child_node(dev, "connector");
++	if (!connector)
++		return -EINVAL;
++
++	port->vdd_vbus = devm_of_regulator_get_optional(dev,
++							 to_of_node(connector),
++							 "vbus");
++	fwnode_handle_put(connector);
++
++	if (port->vdd_vbus == ERR_PTR(-ENODEV))
++		port->vdd_vbus = devm_regulator_get(dev, "vdd-vbus");
++	if (IS_ERR(port->vdd_vbus))
++		return PTR_ERR(port->vdd_vbus);
++
++	port->irq = platform_get_irq_byname(pdev,
++					    res->irq_params[0].irq_name);
++	if (port->irq < 0)
++		return port->irq;
++
++	port->dev = dev;
++	port->regmap = regmap;
++	port->base = base;
++	mutex_init(&port->lock);
++
++	ret = devm_request_threaded_irq(dev, port->irq, NULL,
++					pm660_typec_irq,
++					IRQF_ONESHOT | IRQF_NO_AUTOEN,
++					res->irq_params[0].irq_name, port);
++	if (ret)
++		return ret;
++
++	tcpm->port_priv = port;
++
++	tcpm->tcpc.get_vbus = pm660_typec_get_vbus;
++	tcpm->tcpc.set_vbus = pm660_typec_set_vbus;
++	tcpm->tcpc.get_cc = pm660_typec_get_cc;
++	tcpm->tcpc.set_cc = pm660_typec_set_cc;
++	tcpm->tcpc.set_polarity = pm660_typec_set_polarity;
++	tcpm->tcpc.set_vconn = pm660_typec_set_vconn;
++	tcpm->tcpc.start_toggling = pm660_typec_start_toggling;
++
++	tcpm->port_start = pm660_typec_port_start;
++	tcpm->port_stop = pm660_typec_port_stop;
++
++	return 0;
++}
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.h b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.h
+new file mode 100644
+index 000000000000..2dece40a8b35
+--- /dev/null
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.h
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __QCOM_PMIC_TYPEC_PORT_PM660_H__
++#define __QCOM_PMIC_TYPEC_PORT_PM660_H__
++
++#include "qcom_pmic_typec_port.h"
++
++extern const struct pmic_typec_port_resources pm660_port_res;
++
++int qcom_pmic_typec_pm660_port_probe(struct platform_device *pdev,
++				      struct pmic_typec *tcpm,
++				      const struct pmic_typec_port_resources *res,
++				      struct regmap *regmap,
++				      u32 base);
++
++#endif /* __QCOM_PMIC_TYPEC_PORT_PM660_H__ */

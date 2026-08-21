@@ -1,0 +1,28 @@
+From f5f301628e8fb9dfd62bdbee48aefcdb81ccbf5b Mon Sep 17 00:00:00 2001
+From: Zachary Dry <zach@northbridgetechnology.com>
+Date: Wed, 19 Aug 2026 04:57:20 +0000
+Subject: [PATCH 09/13] usb: typec: qcom: pm660: avoid VBUS notification from
+ set_vbus
+
+Signed-off-by: Zachary Dry <zach@northbridgetechnology.com>
+---
+ drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+index e03fdf3399ee..c6028184b6cc 100644
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+@@ -173,9 +173,6 @@ static int pm660_typec_set_vbus(struct tcpc_dev *tcpc, bool on, bool sink)
+ out:
+ 	mutex_unlock(&port->lock);
+ 
+-	if (!ret)
+-		tcpm_vbus_change(tcpm->tcpm_port);
+-
+ 	return ret;
+ }
+ 
+-- 
+2.43.0
+

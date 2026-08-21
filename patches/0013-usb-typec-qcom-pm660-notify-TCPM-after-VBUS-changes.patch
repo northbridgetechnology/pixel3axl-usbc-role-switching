@@ -1,0 +1,51 @@
+From aac5fb159b67d616e0aa683dd06324a5cc517126 Mon Sep 17 00:00:00 2001
+From: Zachary Dry <zach@northbridgetechnology.com>
+Date: Wed, 19 Aug 2026 07:02:41 +0000
+Subject: [PATCH 13/13] usb: typec: qcom: pm660: notify TCPM after VBUS changes
+
+Signed-off-by: Zachary Dry <zach@northbridgetechnology.com>
+---
+ .../typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c  | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+index bc672a804ef7..f2f162cb3664 100644
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+@@ -155,6 +155,7 @@ static int pm660_typec_set_vbus(struct tcpc_dev *tcpc, bool on, bool sink)
+ {
+ 	struct pmic_typec *tcpm = tcpc_to_tcpm(tcpc);
+ 	struct pm660_typec_port *port = tcpm->port_priv;
++	bool changed = false;
+ 	int ret = 0;
+ 
+ 	(void)sink;
+@@ -169,12 +170,24 @@ static int pm660_typec_set_vbus(struct tcpc_dev *tcpc, bool on, bool sink)
+ 	else
+ 		ret = regulator_disable(port->vdd_vbus);
+ 
+-	if (!ret)
++	if (!ret) {
+ 		port->vbus_enabled = on;
++		changed = true;
++	}
+ 
+ out:
+ 	mutex_unlock(&port->lock);
+ 
++	/*
++	 * set_vbus() may run during tcpm_register_port() before port_start()
++	 * provides tcpm_port. Once registered, notify TCPM whenever the
++	 * source regulator actually changes state. get_vbus() also accounts
++	 * for vbus_enabled when PM660 does not reflect sourced VBUS in
++	 * TYPEC_VBUS_STATUS.
++	 */
++	if (changed && port->tcpm_port)
++		tcpm_vbus_change(port->tcpm_port);
++
+ 	return ret;
+ }
+ 
+-- 
+2.43.0
+

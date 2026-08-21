@@ -1,0 +1,144 @@
+# =============================================================================
+# pixel3axl-usbc-role-switching
+# =============================================================================
+
+# Linux kernel trees / build output
+linux/
+linux-*/
+kernel/
+kernel-*/
+src/linux/
+build/
+out/
+output/
+
+# Kernel build artifacts
+*.o
+*.o.*
+*.a
+*.so
+*.ko
+*.ko.zst
+*.mod
+*.mod.c
+*.mod.o
+*.cmd
+*.d
+*.dtb.tmp
+*.dtbo
+*.dtbo.img
+*.symtypes
+*.order
+Module.symvers
+modules.order
+modules.builtin
+modules.builtin.modinfo
+System.map
+vmlinux
+vmlinux.*
+.tmp_versions/
+.cache.mk
+include/config/
+include/generated/
+
+# Generated kernel / DT binaries
+Image
+Image.gz
+Image.gz-dtb
+Image.lz4
+Image.lz4-dtb
+*.dtb
+
+# Android / postmarketOS images
+*.img
+*.bin
+boot.img
+boot-*.img
+vendor_boot.img
+init_boot.img
+recovery.img
+dtbo.img
+vbmeta.img
+super.img
+userdata.img
+
+# Firmware artifacts
+*.elf
+*.mbn
+*.sin
+*.raw
+*.rawprogram*
+*.sparse
+*.simg
+
+# Archives / build bundles
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.tar.xz
+*.txz
+*.tar.zst
+*.7z
+
+# Patcher output
+*.manifest.json
+*.patched.img
+*-patched.img
+*-test.img
+*-original.img
+work/
+workdir/
+tmp/
+temp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# OS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+Desktop.ini
+
+# Logs / scratch
+*.log
+scratch/
+test-output/
+debug-output/
+
+# -----------------------------------------------------------------------------
+# Python cache / compiled files
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# -----------------------------------------------------------------------------
+# Backup / temporary editor files
+# -----------------------------------------------------------------------------
+*.bak
+*.bak.*
+*.backup
+*.orig
+*.before-*

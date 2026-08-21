@@ -1,0 +1,25 @@
+From cc696116fc6d43403396887a6bac6c1d4210ddc0 Mon Sep 17 00:00:00 2001
+From: northbridgetechnology <zach@northbridgetechnology.com>
+Date: Mon, 17 Aug 2026 22:58:13 -0700
+Subject: [PATCH 02/13] usb: typec: qcom: add private port backend data
+
+Signed-off-by: northbridgetechnology <zach@northbridgetechnology.com>
+---
+ drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h
+index 3c75820c9187..da2f858f3640 100644
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec.h
+@@ -12,6 +12,7 @@ struct pmic_typec {
+ 	struct tcpc_dev		tcpc;
+ 	struct pmic_typec_pdphy	*pmic_typec_pdphy;
+ 	struct pmic_typec_port	*pmic_typec_port;
++	void			*port_priv;
+ 
+ 	int (*pdphy_start)(struct pmic_typec *tcpm,
+ 			   struct tcpm_port *tcpm_port);
+-- 
+2.43.0
+

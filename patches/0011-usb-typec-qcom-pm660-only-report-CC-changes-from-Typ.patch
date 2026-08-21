@@ -1,0 +1,30 @@
+From 3505a17f0bd3941f03d632fbde6f3845a7e7f80d Mon Sep 17 00:00:00 2001
+From: Zachary Dry <zach@northbridgetechnology.com>
+Date: Wed, 19 Aug 2026 06:05:00 +0000
+Subject: [PATCH 11/13] usb: typec: qcom: pm660: only report CC changes from
+ Type-C IRQ
+
+Signed-off-by: Zachary Dry <zach@northbridgetechnology.com>
+---
+ drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+index c6028184b6cc..4939cbe3fbae 100644
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port_pm660.c
+@@ -422,10 +422,8 @@ static irqreturn_t pm660_typec_irq(int irq, void *data)
+ 	 * PM660 exposes a single aggregate "type-c-change" IRQ. TCPM will
+ 	 * reread the PMIC state through get_cc() and get_vbus().
+ 	 */
+-	if (port->tcpm_port) {
++	if (port->tcpm_port)
+ 		tcpm_cc_change(port->tcpm_port);
+-		tcpm_vbus_change(port->tcpm_port);
+-	}
+ 
+ 	return IRQ_HANDLED;
+ }
+-- 
+2.43.0
+

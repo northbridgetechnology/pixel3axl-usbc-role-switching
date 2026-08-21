@@ -1,0 +1,26 @@
+From b26caf853a7728de25b20de4e2967756f4c96d6c Mon Sep 17 00:00:00 2001
+From: Zachary Dry <zach@northbridgetechnology.com>
+Date: Wed, 19 Aug 2026 04:59:45 +0000
+Subject: [PATCH 10/13] power: supply: qcom_smbx: fix PM660 VBUS node lookup
+
+Signed-off-by: Zachary Dry <zach@northbridgetechnology.com>
+---
+ drivers/power/supply/qcom_smbx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/power/supply/qcom_smbx.c b/drivers/power/supply/qcom_smbx.c
+index 34d22b9c6178..c50a9560c57a 100644
+--- a/drivers/power/supply/qcom_smbx.c
++++ b/drivers/power/supply/qcom_smbx.c
+@@ -1286,7 +1286,7 @@ static int smb_probe(struct platform_device *pdev)
+ 		struct device_node *vbus_node;
+ 
+ 		vbus_node = of_get_child_by_name(chip->dev->of_node,
+-						 "qcom,smb2-vbus");
++						 "vbus");
+ 		if (vbus_node) {
+ 			of_node_put(vbus_node);
+ 
+-- 
+2.43.0
+

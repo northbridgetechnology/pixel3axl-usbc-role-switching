@@ -1,0 +1,135 @@
+From afe6d1be1b5351053ae7e70a714ef97c11d8bfe1 Mon Sep 17 00:00:00 2001
+From: northbridgetechnology <zach@northbridgetechnology.com>
+Date: Tue, 18 Aug 2026 00:53:18 -0700
+Subject: [PATCH 07/13] arm64: dts: qcom: sdm670-google: enable PM660 USB-C
+ dual-role
+
+Signed-off-by: northbridgetechnology <zach@northbridgetechnology.com>
+---
+ arch/arm64/boot/dts/qcom/pm660.dtsi           |  2 +-
+ .../boot/dts/qcom/sdm670-google-common.dtsi   | 77 ++++++++++++++++++-
+ 2 files changed, 76 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/pm660.dtsi b/arch/arm64/boot/dts/qcom/pm660.dtsi
+index a27ed5c63018..d831d0efcb14 100644
+--- a/arch/arm64/boot/dts/qcom/pm660.dtsi
++++ b/arch/arm64/boot/dts/qcom/pm660.dtsi
+@@ -34,7 +34,7 @@ pm660_crit: pm660-crit {
+ };
+ 
+ &spmi_bus {
+-	pmic@0 {
++	pm660_0: pmic@0 {
+ 		compatible = "qcom,pm660", "qcom,spmi-pmic";
+ 		reg = <0x0 SPMI_USID>;
+ 		#address-cells = <1>;
+diff --git a/arch/arm64/boot/dts/qcom/sdm670-google-common.dtsi b/arch/arm64/boot/dts/qcom/sdm670-google-common.dtsi
+index aad17eed0c35..05674ab644fe 100644
+--- a/arch/arm64/boot/dts/qcom/sdm670-google-common.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm670-google-common.dtsi
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/sound/qcom,q6afe.h>
+ #include <dt-bindings/sound/qcom,q6asm.h>
+ #include <dt-bindings/sound/qcom,q6voice.h>
++#include <dt-bindings/usb/pd.h>
+ #include "sdm670.dtsi"
+ #include "pm660.dtsi"
+ #include "pm660l.dtsi"
+@@ -1124,6 +1125,72 @@ msm-therm@1 {
+ &pm660_charger {
+ 	monitored-battery = <&battery>;
+ 	status = "okay";
++
++	pm660_vbus: vbus {
++		regulator-name = "pm660-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++};
++
++&pm660_0 {
++	pm660_typec: typec@1300 {
++		compatible = "qcom,pm660-typec";
++		reg = <0x1300>, <0x1700>;
++
++		interrupts = <0x0 0x13 0x7 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x0 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x1 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x2 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x3 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x4 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x5 IRQ_TYPE_EDGE_RISING>,
++			     <0x0 0x17 0x6 IRQ_TYPE_EDGE_RISING>;
++
++		interrupt-names = "type-c-change",
++				  "sig-tx",
++				  "sig-rx",
++				  "msg-tx",
++				  "msg-rx",
++				  "msg-tx-failed",
++				  "msg-tx-discarded",
++				  "msg-rx-discarded";
++
++		vdd-pdphy-supply = <&vreg_l7b_3p125>;
++
++		connector {
++			compatible = "usb-c-connector";
++			label = "USB-C";
++
++			power-role = "dual";
++			data-role = "dual";
++			try-power-role = "sink";
++
++			vbus-supply = <&pm660_vbus>;
++
++			source-pdos = <PDO_FIXED(5000, 900,
++				       PDO_FIXED_DUAL_ROLE |
++				       PDO_FIXED_USB_COMM |
++				       PDO_FIXED_DATA_SWAP)>;
++
++			sink-pdos = <PDO_FIXED(5000, 3000,
++				     PDO_FIXED_DUAL_ROLE |
++				     PDO_FIXED_USB_COMM |
++				     PDO_FIXED_DATA_SWAP)
++				     PDO_FIXED(9000, 3000,
++				     PDO_FIXED_DUAL_ROLE |
++				     PDO_FIXED_USB_COMM |
++				     PDO_FIXED_DATA_SWAP)>;
++
++			op-sink-microwatt = <2500000>;
++
++			port {
++				pm660_typec_hs_in: endpoint {
++					remote-endpoint = <&usb_1_dwc3_hs_out>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &pm660_fg {
+@@ -1524,13 +1591,19 @@ &usb_1 {
+ };
+ 
+ &usb_1_dwc3 {
+-	/* Only peripheral works for now */
+-	dr_mode = "peripheral";
++	dr_mode = "otg";
++	usb-role-switch;
+ 
+ 	/* Do not assume that sdm670.dtsi will never support USB 3.0 */
+ 	phys = <&usb_1_hsphy>;
+ 	phy-names = "usb2-phy";
+ 	maximum-speed = "high-speed";
++
++	port {
++		usb_1_dwc3_hs_out: endpoint {
++			remote-endpoint = <&pm660_typec_hs_in>;
++		};
++	};
+ };
+ 
+ &venus {
+-- 
+2.43.0
+
